@@ -95,6 +95,28 @@ double AbarC(double ttheta,
     }
 }
 
+
+double Phis(double bbeta, double r, double T, double S, double ssigma){
+  double term = pow(bbeta / pow(1+r,ssigma-1), 1/ssigma);
+  return( (1 - pow(term, T-S+1))/(1 - term));
+}
+
+double Phi0(double bbeta, double r, double T, double S, double ssigma){
+  double term = pow(bbeta / pow(1+r,ssigma-1), 1/ssigma);
+  return( (1 - pow(term, S))/(1 - term));
+}
+
+double Phiro(double bbeta, double r, double T, double S, double ssigma){
+  double term = 1 / (1+r);
+  return( (1 - pow(term, T-S+1))/(1 - term));
+}
+
+double Phiry(double bbeta, double r, double T, double S, double ssigma){
+  double term = 1 / (1+r);
+  return( (1 - pow(term, S))/(1 - term));
+}
+
+
 //-----------------------------------------------
 // I. First section of file. Computing utilities
 //    of different alternatives.
@@ -118,7 +140,7 @@ double UNCSTUDY( double b,
                 double tthetaRthreshold,
                 double bRthreshold,
                 double Rsubsidy,
-                double tax){
+                double tax, double T, double S){
     // Relevant Abar
     Abar = AbarC(ttheta, tthetaRthreshold, Abar);
     
@@ -136,36 +158,29 @@ double UNCSTUDY( double b,
         return(-10000);
     }
     else{
-        //Consumption in t=0
-        double num0=bbeta*(1+r);
-        num0=pow(num0,-1/ssigma);
-        
-        double num1=w*ttheta+b*(1+r)-P*(1+r)
-        +min(P,Abar)*r*subR;
-        
-        double den0=bbeta*(1+r);
-        den0=pow(den0,-1/ssigma);
-        den0=(1+r)*den0;
-        den0=1+den0;
-        
-        double cons0=num0*num1/den0;
-        
-        
-        //Consumption in t=1
-        double cons1=num1/den0;
-        
-        //Computing utility if studies
-        
-        double utility=pow(cons0,1-ssigma)/(1-ssigma)-
-        ggamma*(1/(1+ttheta)-0.5)+bbeta*pow(cons1,1-ssigma)/(1-ssigma);
-        
-        
-        //Finally, we need to see if the borrowing constraint is not satisfied:
-        double deuda=cons0+P-b;
-        if (deuda>Abar){
-            utility=pow(-10.0,5.0);
-        }
-        return(utility);
+      
+      double phi0 = Phi0(bbeta, r, T, S, ssigma);
+      double phis = Phis(bbeta, r, T, S, ssigma);
+      double phiro = Phiro(bbeta, r, T, S, ssigma);
+      double phiry = Phiry(bbeta, r, T, S, ssigma);
+      
+      double term = w*ttheta*phiro/phis + (b*pow(1+r, S))/phis - P*phiry*pow(1+r, S)/phis;
+      double disc = pow(bbeta*(1+r), (-S/ssigma));
+      double deno = 1 + disc*(phi0*pow(1+r, S)/phis);
+      
+      double cons0 = disc*term/deno;
+      double cons1 = pow(bbeta*(1+r), (S/ssigma))*cons0;
+      
+      double bbetatilda = pow(bbeta, S)*phis/phi0;
+      
+      double utility=pow(cons0,1-ssigma)/(1-ssigma) + bbetatilda*pow(cons1,1-ssigma)/(1-ssigma);
+      
+      //Finally, we need to see if the borrowing constraint is not satisfied:
+      double deuda=cons0+P-b;
+      if (deuda>Abar){
+          utility=pow(-10.0,5.0);
+      }
+      return(utility);
     }
 }
 
@@ -186,7 +201,7 @@ double CSTUDY(double b,
               double tthetaRthreshold,
               double bRthreshold,
               double Rsubsidy,
-              double tax){
+              double tax, double T, double S){
     
     // Relevant Abar
     Abar = AbarC(ttheta, tthetaRthreshold, Abar);
@@ -204,28 +219,34 @@ double CSTUDY(double b,
     }
     else{
         
-        //Consumption in t=0
-        double cons0=b-P+Abar;
-        
-        
-        //Consumption in t=1
-        double cons1=w*ttheta-(1+r)*Abar+r*subR*min(Abar,P);
-        
-        //Computing utility:
-        double utility=0;
-        
-        
-        //Consumption negative,bad utility
-        if (cons0 <0 || cons1<0){
-            utility=pow(-10.0,5.0);
-        }
-        
-        //Consumption positive, compute usual utility
-        else{
-            utility=pow(cons0,1-ssigma)/(1-ssigma)-
-            ggamma*(1/(1+ttheta)-0.5)+bbeta*pow(cons1,1-ssigma)/(1-ssigma);
-        }
-        return(utility);
+      double phi0 = Phi0(bbeta, r, T, S, ssigma);
+      double phis = Phis(bbeta, r, T, S, ssigma);
+      double phiro = Phiro(bbeta, r, T, S, ssigma);
+      double phiry = Phiry(bbeta, r, T, S, ssigma);
+      
+      //Consumption in t=0
+      double cons0 = (1/phi0)*(b+(Abar/pow(1+r, S)) - P*phiry);
+      
+      
+      //Consumption in t=1
+      double cons1=(1/phis)*(w*ttheta*phiro-Abar);
+      
+      double bbetatilda = pow(bbeta, S)*phis/phi0;
+      
+      //Computing utility:
+      double utility=0;
+      
+      
+      //Consumption negative,bad utility
+      if (cons0 <0 || cons1<0){
+          utility=pow(-10.0,5.0);
+      }
+      
+      //Consumption positive, compute usual utility
+      else{
+          utility=pow(cons0,1-ssigma)/(1-ssigma) + bbetatilda*pow(cons1,1-ssigma)/(1-ssigma);
+      }
+      return(utility);
     }
 }
 
@@ -240,7 +261,7 @@ double UNCNOTSTUDY(double b,
                    double ggamma,
                    double r,
                    double Abar,
-                   double tax){
+                   double tax, double T, double S){
     
     // Relevant Abar
     Abar = 0;
@@ -249,25 +270,23 @@ double UNCNOTSTUDY(double b,
     b=bfinal(b,tax);
     
     //Consumption in t=0
-    double num0=bbeta*(1+r);
-    num0=pow(num0,-1/ssigma);
+    double phi0 = Phi0(bbeta, r, T, S, ssigma);
+    double phis = Phis(bbeta, r, T, S, ssigma);
+    double phiro = Phiro(bbeta, r, T, S, ssigma);
+    double phiry = Phiry(bbeta, r, T, S, ssigma);
     
-    double num1=w*ttheta*(2+r)+b*(1+r);
+    double term = w*ttheta*((phiro + pow(1+r,S)*phiry)/phis) + (b*pow(1+r, S))/phis;
+    double disc = pow(bbeta*(1+r), (-S/ssigma));
+    double deno = 1 + disc*(phi0*pow(1+r, S)/phis);
     
-    double den0=bbeta*(1+r);
-    den0=pow(den0,-1/ssigma);
-    den0=(1+r)*den0;
-    den0=1+den0;
-    
-    double cons0=num0*num1/den0;
-    
-    
-    //Consumption in t=1
-    double cons1=num1/den0;
-    
+    double cons0 = disc*term/deno;
+    double cons1 = pow(bbeta*(1+r), (S/ssigma))*cons0;
+
     //Computing utility if studies
     
-    double utility=pow(cons0,1-ssigma)/(1-ssigma)+bbeta*pow(cons1,1-ssigma)/(1-ssigma);
+    double bbetatilda = pow(bbeta, S)*phis/phi0;
+    
+    double utility=pow(cons0,1-ssigma)/(1-ssigma) + bbetatilda*pow(cons1,1-ssigma)/(1-ssigma);
     
     //Finally, check if borrowing constraint is satisfied
     double deuda=cons0-b-w*ttheta;
@@ -290,7 +309,7 @@ double CNOTSTUDY(double b,
                  double ggamma,
                  double r,
                  double Abar,
-                 double tax){
+                 double tax, double T, double S){
     
     // Relevant Abar
     Abar = 0;
@@ -298,12 +317,19 @@ double CNOTSTUDY(double b,
     //Final income
     b=bfinal(b, tax);
     
+    double phi0 = Phi0(bbeta, r, T, S, ssigma);
+    double phis = Phis(bbeta, r, T, S, ssigma);
+    double phiro = Phiro(bbeta, r, T, S, ssigma);
+    double phiry = Phiry(bbeta, r, T, S, ssigma);
+    
     //Consumption in t=0
-    double cons0=b+Abar+w*ttheta;
+    double cons0 = (w*ttheta*phiry + b + Abar/pow(1+r, S)) * (1/phi0);
     
     
     //Consumption in t=1
-    double cons1=w*ttheta-(1+r)*Abar;
+    double cons1=(w*ttheta*phiro - Abar)*(1/phis);
+    
+    double bbetatilda = pow(bbeta, S)*phis/phi0;
     
     //Computing utility:
     double utility=0;
@@ -317,8 +343,7 @@ double CNOTSTUDY(double b,
     
     //Consumption positive, compute usual utility
     else{
-        utility=pow(cons0,1-ssigma)/(1-ssigma)+
-        bbeta*pow(cons1,1-ssigma)/(1-ssigma);
+        utility=pow(cons0,1-ssigma)/(1-ssigma) + bbetatilda*pow(cons1,1-ssigma)/(1-ssigma);
     }
     
     return(utility);
@@ -343,7 +368,7 @@ double DEBTCSTUDY(double b,
                   double tthetaRthreshold,
                   double bRthreshold,
                   double Rsubsidy,
-                  double tax){
+                  double tax, double T, double S){
     
     // Relevant Abar
     Abar = AbarC(ttheta, tthetaRthreshold, Abar);
@@ -485,48 +510,37 @@ vector<double> decision( double b,
                         double tthetaRthreshold,
                         double bRthreshold,
                         double Rsubsidy,
-                        double tax){
+                        double tax, double T, double S){
     //The vector decision will store the decision and the amount of debt that is subject for govt. subsidy for each person.
     vector<double> decision;
-    decision.resize(3);
+    decision.resize(2);
     
-    double uncstudy_h = UNCSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
-    double debtuncstudy_h=DEBTUNCSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    double uncstudy_h = UNCSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
+
+    double uncstudy_l = UNCSTUDY(b, ttheta, ssigma, bbeta, wl, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
-    double uncstudy_l = UNCSTUDY(b, ttheta, ssigma, bbeta, wl, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    double cstudy_h = CSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
-    double debtuncstudy_l=DEBTUNCSTUDY(b, ttheta, ssigma, bbeta, wh, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    double debtcstudy_h=DEBTCSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
-    double cstudy_h = CSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    double cstudy_l = CSTUDY(b, ttheta, ssigma, bbeta, wl, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
-    double debtcstudy_h=DEBTCSTUDY(b, ttheta, ssigma, bbeta, wh, Ph, ggamma, r, Abar, tthetaadmissionh, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    double debtcstudy_l=DEBTCSTUDY(b, ttheta, ssigma, bbeta, wh, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
-    double cstudy_l = CSTUDY(b, ttheta, ssigma, bbeta, wl, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
-    
-    double debtcstudy_l=DEBTCSTUDY(b, ttheta, ssigma, bbeta, wh, Pl, ggamma, r, Abar, tthetaadmissionl, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
-    
-    double uncnotstudy = UNCNOTSTUDY(b, ttheta, ssigma, bbeta, w, ggamma, r, Abar, tax);
-    double cnotstudy = CNOTSTUDY(b, ttheta, ssigma, bbeta, w, ggamma, r, Abar, tax);
+    double uncnotstudy = UNCNOTSTUDY(b, ttheta, ssigma, bbeta, w, ggamma, r, Abar, tax, T, S);
+    double cnotstudy = CNOTSTUDY(b, ttheta, ssigma, bbeta, w, ggamma, r, Abar, tax, T, S);
     
     if(uncstudy_h > uncstudy_l && uncstudy_h > cstudy_l && uncstudy_h > uncnotstudy && uncstudy_h > cnotstudy){
         decision[0] = 1;
-        decision[2]=debtuncstudy_h;
     }
     else if (cstudy_h > uncstudy_l && cstudy_h > cstudy_l && cstudy_h > uncnotstudy && cstudy_h > cnotstudy){
         decision[0] = 1;
-        decision[2]=debtcstudy_h;
     }
     else if(uncstudy_l > uncstudy_h && uncstudy_l > cstudy_h && uncstudy_l > uncnotstudy && uncstudy_l > cnotstudy){
         decision[1] = 1;
-        decision[2]=debtuncstudy_l;
     }
     else if (cstudy_l > uncstudy_h && cstudy_l > cstudy_h && cstudy_l > uncnotstudy && cstudy_l > cnotstudy){
         decision[1] = 1;
-        decision[2]=debtcstudy_l;
-    }
-    //If don't study,no subsidy.
-    if(decision[1]==0 && decision[0]==0){
-        decision[2]=0;
     }
     return(decision);
 }
@@ -556,7 +570,7 @@ vector<double> aaverages(double zh,
                          double tthetaRthreshold,
                          double bRthreshold,
                          double Rsubsidy,
-                         double tax){
+                         double tax, double T, double S){
     
     // Returns a vector with <thetaaverage1, bbaverage1, numberstudents1, thetaaverage2, bbaverage2, numberstudents2>
     vector<double> result;
@@ -600,7 +614,7 @@ vector<double> aaverages(double zh,
 #pragma omp parallel for shared(MATGRIDh, MATGRIDl) private(res)
     for (int bb=0; bb<bbnumber; bb=bb+1){
         for (int tt=0; tt<ttnumber; tt=tt+1){
-            res = decision(bbgrid[bb], ttgrid[tt], ssigma, bbeta, w, w*(1+zl), w*(1+zh), Pl, Ph, tthetaadmissionl, tthetaadmissionh, ggamma, r, Abar, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+            res = decision(bbgrid[bb], ttgrid[tt], ssigma, bbeta, w, w*(1+zl), w*(1+zh), Pl, Ph, tthetaadmissionl, tthetaadmissionh, ggamma, r, Abar, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
             MATGRIDh[bb][tt] = res[0];
             MATGRIDl[bb][tt] = res[1];
         }
@@ -649,79 +663,6 @@ vector<double> aaverages(double zh,
 }
 
 
-vector<double> BudgetRevenue(double zh,
-                             double zl,
-                             vector<double> bbgrid,
-                             vector<double> ttgrid,
-                             double ssigma,
-                             double bbeta,
-                             double w,
-                             double Pl,
-                             double Ph,
-                             double ggamma,
-                             double Abar,
-                             double r,
-                             double tthetaadmissionl,
-                             double tthetaadmissionh,
-                             double tthetaRthreshold,
-                             double bRthreshold,
-                             double Rsubsidy,
-                             double tax){
-    
-    // Returns a vector with <thetaaverage1, bbaverage1, numberstudents1, thetaaverage2, bbaverage2, numberstudents2>
-    vector<double> result;
-    result.resize(3);
-    
-    //0. bbgrid: grid of bequests
-    //   ttgrid: grid of ttheta
-    
-    //0.0. Getting the size of matrix of distributions
-    int bbnumber=bbgrid.size(); //Size along b dim
-    int ttnumber=ttgrid.size(); //Size along ttheta dimension.
-    
-    //0.1 Generating matrix
-    vector<vector<double> > TAX;
-    vector<vector<double> > SUBSIDY;
-    TAX.resize(bbnumber);
-    SUBSIDY.resize(bbnumber);
-    for (int n=0; n<bbnumber; n++){
-        TAX[n].resize(ttnumber);
-        SUBSIDY[n].resize(ttnumber);
-    }
-    
-    
-    //For each student, identifying if it is
-    //worth or not studying
-    
-    vector<double> res;
-    res.resize(3);
-    //#pragma omp parallel for shared(SUBSIDY, TAX) private(res,consH)
-    for (int bb=0; bb<bbnumber; bb=bb+1){
-        for (int tt=0; tt<ttnumber; tt=tt+1){
-            res = decision(bbgrid[bb], ttgrid[tt], ssigma, bbeta, w, w*(1+zl), w*(1+zh), Pl, Ph, tthetaadmissionl, tthetaadmissionh, ggamma, r, Abar, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
-            TAX[bb][tt] = bbgrid[bb]*tax;
-            SUBSIDY[bb][tt] = res[2];
-        }
-    }
-    
-    //Computing the government surplus
-    double surp=0;
-    double taxrev=0;
-    double subs=0;
-    for (int bb=0; bb<bbnumber; bb=bb+1){
-        for (int tt=0; tt<ttnumber; tt=tt+1){
-            surp +=TAX[bb][tt]- SUBSIDY[bb][tt]/(1+r);
-            subs+=SUBSIDY[bb][tt]/(1+r);
-            taxrev+=TAX[bb][tt];
-        }
-    }
-    
-    
-    result[0]=surp;
-    result[1]=subs;
-    result[2]=taxrev;
-    return(result);
-}
 
 //Function of variable cost for universities
 double VariableCHigh(double Nh){
@@ -758,7 +699,7 @@ vector<double> Zs(double aalpha1, double aalpha2,
                   double Rsubsidy,
                   double tax,
                   double ZHPAR,
-                  double ZLPAR){
+                  double ZLPAR, double T, double S){
     
     //0. Block of explanation of parameters:
     //0.1 pH-> Price of high education
@@ -771,7 +712,7 @@ vector<double> Zs(double aalpha1, double aalpha2,
     vector<double> x;
     x.resize(6);
     
-    x = aaverages(zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    x = aaverages(zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     
     //1. Block of computing intermediate functions
     
@@ -857,7 +798,7 @@ double errZ(double aalpha1, double aalpha2,
             double Rsubsidy,
             double tax,
             double ZHPAR,
-            double ZLPAR){
+            double ZLPAR, double T, double S){
     
     
     //0. Block of explanation of parameters-> All defined previously
@@ -866,7 +807,7 @@ double errZ(double aalpha1, double aalpha2,
     
     //1. Computing intermediate functions.
     //1.1. Vector of zpitted elements
-    vector<double> ZSpit=Zs(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    vector<double> ZSpit=Zs(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     //1.2 Computing each error squared
     double zher1=pow((ZSpit[0]-zHof),2);
@@ -908,6 +849,8 @@ typedef struct FP_params{
     double PARtax;
     double PARZHPAR;
     double PARZLPAR;
+    double PART;
+    double PARS;
     ;}pricesolver;
 
 double FP_rootminsquarederror(unsigned n, const double *x,
@@ -937,6 +880,8 @@ double FP_rootminsquarederror(unsigned n, const double *x,
     double tax=p->PARtax;
     double ZHPAR=p->PARZHPAR;
     double ZLPAR=p->PARZLPAR;
+    double T=p->PART;
+    double S=p->PARS;
     if (1==2){
         cout << " -------------------"<<endl;
         cout << " loading FP_rootminsquarederror"<<endl;
@@ -967,13 +912,8 @@ double FP_rootminsquarederror(unsigned n, const double *x,
     double residual=errZ( aalpha1,  aalpha2,
                          RMCH,  RMCL,x[1]+x[0],x[0], bbgrid, ttgrid,ssigma,bbeta,
                          w,pL,pH,ggamma,Abar,r,tthetaLthres,tthetaHthres,
-                         tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR);
+                         tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S);
     double arrengment=residual;
-    
-    
-    
-    
-    
     
     if (isnan(residual)==1){
         //I will try to generate normal deviates as min in case we have NAN so that
@@ -1007,13 +947,13 @@ vector<double>ZFP(double aalpha1, double aalpha2,
                   double Rsubsidy,
                   double tax,
                   double ZHPAR,
-                  double ZLPAR){
+                  double ZLPAR, double T, double S){
     
     
     //Loading the structure
     pricesolver parstructest={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,pH,ggamma,Abar,r,tthetaLthres,tthetaHthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     
     //Set up the optimization algorrithm
@@ -1022,13 +962,13 @@ vector<double>ZFP(double aalpha1, double aalpha2,
     nlopt_set_min_objective(opt,FP_rootminsquarederror,&parstructest);
     nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     //const double tolerance=1.0e-5;
-    double LB[2]={1,0};
+    double LB[2]={0.05,0};
     double UB[2]={100,100};
     nlopt_set_lower_bounds(opt, LB);
     nlopt_set_upper_bounds(opt, UB);
     double xtest[2]={};
-    xtest[0]=1.2;
-    xtest[1]= 0.3;
+    xtest[0]=0.7;
+    xtest[1]= 0.1;
     //nlopt_set_xtol_abs(opt, &tolerance);
     //Initial guess
     //double xtest[2]={};
@@ -1082,20 +1022,20 @@ double zOBJ_HIGH(double aalpha1, double aalpha2,
                  double Rsubsidy,
                  double tax,
                  double ZHPAR,
-                 double ZLPAR){
+                 double ZLPAR, double T, double S){
     
     //First compute the fixed point and find ZH and ZL
     vector<double> F;
     F.resize(3);
     
     
-    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     double zLFound=F[0];
     double zHFound=F[0]+F[1];
     //Finding the elements from the consumers
     vector<double> Consumers;
     Consumers.resize(6);
-    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     double tthetaHbar=Consumers[0];
     double bbHaverage=Consumers[1];
     double invbbHaverage=1/bbHaverage;
@@ -1174,18 +1114,18 @@ double zOBJ_LOW(double aalpha1, double aalpha2,
                 double Rsubsidy,
                 double tax,
                 double ZHPAR,
-                double ZLPAR){
+                double ZLPAR, double T, double S){
     
     //First compute the fixed point and find ZH and ZL
     vector<double> F;
     F.resize(3);
-    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     double zLFound=F[0];
     double zHFound=F[0]+F[1];
     //Finding the elements from the consumers
     vector<double> Consumers;
     Consumers.resize(6);
-    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     double tthetaLbar=Consumers[3];
     double bbLaverage=Consumers[4];
     double invbbLaverage=1/bbLaverage;
@@ -1265,6 +1205,8 @@ typedef struct MAXZ_params{
     double PARtax;
     double PARZHPAR;
     double PARZLPAR;
+    double PART;
+    double PARS;
     ;}optvalues;
 
 //Objective of the high university
@@ -1293,7 +1235,8 @@ double zOBS_HIGH_maximizer(unsigned n, const double *x,
     double tax=p->PARtax;
     double ZHPAR=p->PARZHPAR;
     double ZLPAR=p->PARZLPAR;
-    
+    double T = p->PART;
+    double S = p->PARS;
     
     //Loagind inputs
     //Loagind inputs
@@ -1307,7 +1250,7 @@ double zOBS_HIGH_maximizer(unsigned n, const double *x,
     double OBJHIGH=zOBJ_HIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,
                              ttgrid, ssigma, bbeta, w, pL, priceOWN,
                              ggamma, Abar, r, tthetaLthres,
-                             tthetaOWNTHRESHOLD, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+                             tthetaOWNTHRESHOLD, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     //cout << "-----"<<endl;
     if(1==2){
@@ -1367,6 +1310,9 @@ double zOBS_LOW_maximizer(unsigned n, const double *x,
     double tax=p->PARtax;
     double ZHPAR=p->PARZHPAR;
     double ZLPAR=p->PARZLPAR;
+    double T = p->PART;
+    double S = p->PARS;
+    
     //Loagind inputs
     double priceOWN=x[0];
     double tthetaOWNTHRESHOLD=x[1];
@@ -1378,7 +1324,7 @@ double zOBS_LOW_maximizer(unsigned n, const double *x,
     double OBJLOW=zOBJ_LOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,
                            ttgrid, ssigma, bbeta, w, priceOWN, pH,
                            ggamma, Abar, r, tthetaOWNTHRESHOLD,
-                           tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+                           tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     if(1==2){
         
         cout << " ------------ " << endl;
@@ -1424,19 +1370,19 @@ vector<double> optHIGH(double aalpha1, double aalpha2,
                        double Rsubsidy,
                        double tax,
                        double ZHPAR,
-                       double ZLPAR){
+                       double ZLPAR, double T, double S){
     
     //Loading the structure:
     optvalues paroptHIGH={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,ggamma,Abar,r,tthetaLthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     
     //Set up the optimization algorrithm
     nlopt_opt opt;
     opt=nlopt_create(NLOPT_LN_NELDERMEAD,2);// Dimension 1. Algoritthm cobyla
     nlopt_set_max_objective(opt,zOBS_HIGH_maximizer,&paroptHIGH);
-    nlopt_set_xtol_rel(opt, 5.0e-3); //Tolerance
+    nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     double LB[2]={0,0};
     double UB[2]={50,1};
     nlopt_set_lower_bounds(opt, LB);
@@ -1488,19 +1434,19 @@ vector<double> optLOW(double aalpha1, double aalpha2,
                       double Rsubsidy,
                       double tax,
                       double ZHPAR,
-                      double ZLPAR){
+                      double ZLPAR, double T, double S){
     
     //Loading the structure:
     optvalues paroptLOW={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pH,ggamma,Abar,r,tthetaHthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     
     //Set up the optimization algorrithm
     nlopt_opt opt;
     opt=nlopt_create(NLOPT_LN_NELDERMEAD,2);// Dimension 1. Algoritthm cobyla
     nlopt_set_max_objective(opt,zOBS_LOW_maximizer,&paroptLOW);
-    nlopt_set_xtol_rel(opt, 5.0e-3); //Tolerance
+    nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     double LB[2]={0,0};
     double UB[2]={pH,tthetaHthres};
     nlopt_set_lower_bounds(opt, LB);
@@ -1552,7 +1498,7 @@ vector<double> NASHEQUILIBRIUM(double aalpha1, double aalpha2,
                                double tax,
                                double ZHPAR,
                                double ZLPAR,
-                               int WRITE){
+                               int WRITE, double T, double S){
     
     //Write is an integer. If set equal to one, it will write a csv file with the output of the NEQ.
     
@@ -1566,11 +1512,11 @@ vector<double> NASHEQUILIBRIUM(double aalpha1, double aalpha2,
     //Defining the parameters
     optvalues paroptHIGH={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,ggamma,Abar,r,tthetaLthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     optvalues paroptLOW={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pH,ggamma,Abar,r,tthetaHthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     //Defining old and new guess vector
     double NewPH=0;
@@ -1598,7 +1544,7 @@ vector<double> NASHEQUILIBRIUM(double aalpha1, double aalpha2,
         
         //Update zhparused
         //ZHPARUSED=ZHPAR;
-        vector<double> optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED);
+        vector<double> optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED, T, S);
         
         NewPH= optH[0];
         NewTH= optH[1];
@@ -1615,7 +1561,7 @@ vector<double> NASHEQUILIBRIUM(double aalpha1, double aalpha2,
         
         //if(iterator % 2 == 1){
         //ZLPARUSED=ZLPAR;
-        vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED);
+        vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED, T, S);
         
         NewPL=optL[0] ;
         NewTL=optL[1];
@@ -1699,18 +1645,18 @@ double NASHERROR(double aalpha1, double aalpha2,
                                double Rsubsidy,
                                double tax,
                                double ZHPAR,
-                               double ZLPAR){
+                               double ZLPAR, double T, double S){
     
 
 
     //Defining the structures
     optvalues paroptHIGH={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,ggamma,Abar,r,tthetaLthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     optvalues paroptLOW={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pH,ggamma,Abar,r,tthetaHthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     //Defining old and new guess vector
     double NewPH=0;
@@ -1725,7 +1671,7 @@ double NASHERROR(double aalpha1, double aalpha2,
     
     //Loading up the parameters
     //Finding optimized parameters for high university
-    vector<double> optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED);
+    vector<double> optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED, T, S);
         
     NewPH= optH[0];
     NewTH= optH[1];
@@ -1734,7 +1680,7 @@ double NASHERROR(double aalpha1, double aalpha2,
         
         
     //Finding optimized parameters for low university
-    vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED);
+    vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPARUSED,ZLPARUSED, T, S);
         
     NewPL=optL[0] ;
     NewTL=optL[1];
@@ -1785,6 +1731,8 @@ typedef struct NASHERROR_params{
     double PARtax;
     double PARZHPAR;
     double PARZLPAR;
+    double PART;
+    double PARS;
     ;}NASHERRORSTRUCTURE;
 
 
@@ -1818,6 +1766,9 @@ double NASHERROROPTIMIZERINTERM(unsigned n, const double *x,
     double tax=p->PARtax;
     double ZHPAR=p->PARZHPAR;
     double ZLPAR=p->PARZLPAR;
+    double T = p->PART;
+    double S = p->PARS;
+    
     //Loagind inputs
     double pL=x[0];
     double pH=x[1];
@@ -1827,7 +1778,7 @@ double NASHERROROPTIMIZERINTERM(unsigned n, const double *x,
     //Finding the nash error
     double ans=0;
     cout << " here  " << endl;
-    ans=NASHERROR(aalpha1, aalpha2, RMCH, RMCL,bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold,Rsubsidy, tax, ZHPAR, ZLPAR);
+    ans=NASHERROR(aalpha1, aalpha2, RMCH, RMCL,bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold,Rsubsidy, tax, ZHPAR, ZLPAR, T, S);
     return(ans);
 }
 
@@ -1849,17 +1800,17 @@ vector<double> NASHERRORFINDER(double aalpha1, double aalpha2,
                  double Rsubsidy,
                  double tax,
                  double ZHPAR,
-                 double ZLPAR){
+                 double ZLPAR, double T, double S){
     
     //Load the structure used for Nash
     NASHERRORSTRUCTURE NASHERROR_params={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
-        ssigma,bbeta,w,ggamma,Abar,r,tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        ssigma,bbeta,w,ggamma,Abar,r,tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     //Setting the optimizer
     nlopt_opt opt;
     opt=nlopt_create(NLOPT_LN_NELDERMEAD,4); //Algorithm and dimensions
     nlopt_set_min_objective(opt,NASHERROROPTIMIZERINTERM,&NASHERROR_params);
-    nlopt_set_xtol_rel(opt, 1.0e-1); //Tolerance
+    nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     
     
     //Setting the initial levels
@@ -1932,12 +1883,12 @@ vector<double> QUALITIES(double aalpha1, double aalpha2,
                          double Rsubsidy,
                          double tax,
                          double ZHPAR,
-                         double ZLPAR){
+                         double ZLPAR, double T, double S){
     
     //Finding the elements from the consumers
     vector<double> Consumers;
     Consumers.resize(6);
-    Consumers=aaverages(zH, zL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    Consumers=aaverages(zH, zL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     double tthetaHbar=Consumers[0];
     double bbHaverage=Consumers[1];
     double Nh=Consumers[2];
@@ -1988,19 +1939,19 @@ vector<double> optHIGHverify(double aalpha1, double aalpha2,
                              double Rsubsidy,
                              double tax,
                              double ZHPAR,
-                             double ZLPAR, double PHinitial, double tHinitial){
+                             double ZLPAR, double PHinitial, double tHinitial, double T, double S){
     
     //Loading the structure:
     optvalues paroptHIGH={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,ggamma,Abar,r,tthetaLthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     
     //Set up the optimization algorrithm
     nlopt_opt opt;
     opt=nlopt_create(NLOPT_LN_NELDERMEAD,2);// Dimension 1. Algoritthm cobyla
     nlopt_set_max_objective(opt,zOBS_HIGH_maximizer,&paroptHIGH);
-    nlopt_set_xtol_rel(opt, 1.0e-2); //Tolerance
+    nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     double LB[2]={0,0};
     double UB[2]={50,1};
     nlopt_set_lower_bounds(opt, LB);
@@ -2050,19 +2001,19 @@ vector<double> optLOWverify(double aalpha1, double aalpha2,
                             double Rsubsidy,
                             double tax,
                             double ZHPAR,
-                            double ZLPAR, double PLinitial, double tLinitial){
+                            double ZLPAR, double PLinitial, double tLinitial, double T, double S){
     
     //Loading the structure:
     optvalues paroptLOW={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pH,ggamma,Abar,r,tthetaHthres,
-        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthreshold,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     
     //Set up the optimization algorrithm
     nlopt_opt opt;
     opt=nlopt_create(NLOPT_LN_NELDERMEAD,2);// Dimension 1. Algoritthm cobyla
     nlopt_set_max_objective(opt,zOBS_LOW_maximizer,&paroptLOW);
-    nlopt_set_xtol_rel(opt, 1.0e-2); //Tolerance
+    nlopt_set_xtol_rel(opt, 1.0e-3); //Tolerance
     double LB[2]={0,0};
     double UB[2]={pH,tthetaHthres};
     nlopt_set_lower_bounds(opt, LB);
@@ -2114,7 +2065,7 @@ vector<double>MOMENTS(double aalpha1, double aalpha2,
                       double Rsubsidy,
                       double tax,
                       double ZHPAR,
-                      double ZLPAR){
+                      double ZLPAR, double T, double S){
     
     
     int iterator=0; ///Variable used multiple times in this function
@@ -2128,13 +2079,13 @@ vector<double>MOMENTS(double aalpha1, double aalpha2,
     F.resize(3);
     
     
-    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     double zLFound=F[0];
     double zHFound=F[0]+F[1];
     //Finding the elements from the consumers
     vector<double> Consumers;
     Consumers.resize(6);
-    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+    Consumers=aaverages(zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
     double tthetaHbar=Consumers[0];
     double bbHaverage=Consumers[1];
     double invbbHaverage=1/bbHaverage;
@@ -2165,7 +2116,7 @@ vector<double>MOMENTS(double aalpha1, double aalpha2,
     res.resize(2);
     for (int bb=0; bb<bbnumber; bb=bb+1){
         for (int tt=0; tt<ttnumber; tt=tt+1){
-            res = decision(bbgrid[bb], ttgrid[tt], ssigma, bbeta, w, w*(1+zLFound), w*(1+zHFound), pL, pH, tthetaLthres, tthetaHthres, ggamma, r, Abar, tthetaRthreshold, bRthreshold, Rsubsidy, tax);
+            res = decision(bbgrid[bb], ttgrid[tt], ssigma, bbeta, w, w*(1+zLFound), w*(1+zHFound), pL, pH, tthetaLthres, tthetaHthres, ggamma, r, Abar, tthetaRthreshold, bRthreshold, Rsubsidy, tax, T, S);
             MATGRIDh[bb][tt] = res[0];
             MATGRIDl[bb][tt] = res[1];
         }
@@ -2206,16 +2157,16 @@ int main(int argc, const char * argv[])
     //0. Testing the functions
     
     //0.0 Setting the parameters to test the functions
-    double aalpha1=0.45; //Initial 0.25 ; 0.25
-    double aalpha2=0.35;
-    double RMCH=-155;  //For high I did RMCH=-1500,RMCL=-2000. Initial 3 and 2.
-    double RMCL=-160;
+    double aalpha1=0.211; //Initial 0.25 ; 0.25
+    double aalpha2=0.358;
+    double RMCH=-12;  //For high I did RMCH=-1500,RMCL=-2000. Initial 3 and 2.
+    double RMCL=-7;
     double zHof=1.4;
     double zLof=1.2;
     
     //Generating bbgrid:
     vector<double> bbgrid;
-    int bgridsize=50;
+    int bgridsize=100;
     bbgrid.resize(bgridsize);
     double bbgridmax=10;
     double bbgridmin=0;
@@ -2234,7 +2185,7 @@ int main(int argc, const char * argv[])
     
     //Ttheta grid
     vector<double> ttgrid;
-    int ttgridsize=700;
+    int ttgridsize=200;
     ttgrid.resize(ttgridsize);
     double ttgridmax=1;
     double ttgridmin=0;
@@ -2255,6 +2206,8 @@ int main(int argc, const char * argv[])
        // cout << x << " x test parallel"<< endl;
     }
     
+    double T = 80.0;
+    double S = 5.0;
     double ssigma=2;
     double bbeta=0.971;
     double w=2;
@@ -2262,19 +2215,19 @@ int main(int argc, const char * argv[])
     double pH=0.55;
     double ggamma=0.00;
     double Abar=2;
-    double r=0.03;
+    double r=0.02;
     double tthetaLthres=0.1;
-    double tthetaHthres=0.5;
+    double tthetaHthres=0.6;
     double tthetaRthres=0.7;
     double bRthreshold=5;
-    double Rsubsidy=0.0; //Rsubsidy=0.5 and tax of 0.1 works fine
-    double tax=0.0;
-    double ZHPAR=3.9;  //90 AND 80 WORKED FINE
-    double ZLPAR=3.6;
+    double Rsubsidy=0.5; //Rsubsidy=0.5 and tax of 0.1 works fine
+    double tax=0.1;
+    double ZHPAR=1.4;  //90 AND 80 WORKED FINE
+    double ZLPAR=1.2;
     //Defining the structure
     pricesolver parstructest={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,pH,ggamma,Abar,r,tthetaLthres,tthetaHthres,
-        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     //0.1 Testing the functions
     
@@ -2287,7 +2240,7 @@ int main(int argc, const char * argv[])
     //pH=1.41;
     //tthetaHthres=0.8;
     
-    x = aaverages(zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax);
+    x = aaverages(zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax, T, S);
     cout << " ======Averages======= " << endl;
     cout << zHof << " zHof " << endl;
     cout << zLof << " zLof " << endl;
@@ -2300,31 +2253,9 @@ int main(int argc, const char * argv[])
     cout << x[5]<< " Ltotal"<< endl;
     cout << " ============= " << endl;
     
-    //Verifying debt functions for households
-    cout << " ======Debt======= " << endl;
-    double btest=2;
-    double tthetatest=0.9;
-    double deCbtest=DEBTCSTUDY( btest,tthetatest, ssigma, bbeta,w,pL,ggamma,r,Abar,tthetaLthres,tthetaRthres,bRthreshold,Rsubsidy,tax);
-    double deUbtest=DEBTUNCSTUDY( btest,tthetatest, ssigma, bbeta,w,pL,ggamma,r,Abar,tthetaLthres,tthetaRthres,bRthreshold,Rsubsidy,tax);
-    cout << deCbtest << " debt for constrained study people " << endl;
-    cout << deUbtest << " debt for unconstrained study people " << endl;
-    cout << " ================ " << endl;
-    
-    
-    //Verifying budget revenue
-    
-    
-    vector<double> Budget;
-    Budget.resize(3);
-    Budget = BudgetRevenue(zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, 0.0001);
-    cout << " ======Budget govt======= " << endl;
-    cout << Budget[0] << " surplus  " << endl;
-    cout << Budget[1] << " Subsidy  " << endl;
-    cout << Budget[2] << " Tax revenue  " << endl;
-    cout << " ================ " << endl;
-    
+
     //2 Zs
-    vector<double> testZs=Zs(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    vector<double> testZs=Zs(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     cout << " ============= " << endl;
     cout << " Test Zs " << endl;
     cout << testZs[0] << " testZs[0] " << endl;
@@ -2334,7 +2265,7 @@ int main(int argc, const char * argv[])
     //3 test
     
     
-    double testERZ=errZ(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    double testERZ=errZ(aalpha1, aalpha2, RMCH, RMCL, zHof, zLof, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     cout << " ============= " << endl;
     cout << " Test Zs " << endl;
     cout << testERZ<< " errZ " << endl;
@@ -2356,7 +2287,7 @@ int main(int argc, const char * argv[])
     cout << " ===INSIDE OF ZFP========== " << endl;
 
     
-    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     
     
@@ -2371,20 +2302,20 @@ int main(int argc, const char * argv[])
     //Verifying the solution
     cout << " =========== " << endl;
     cout << " Verifying solution " << endl;
-    double errV=errZ(aalpha1, aalpha2, RMCH, RMCL, zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    double errV=errZ(aalpha1, aalpha2, RMCH, RMCL, zHFound, zLFound, bbgrid, ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     cout << errV << " Error verified " << endl;
     
     //Verifying objective function of high firm
     cout << "==========="<< endl;
     cout << " Obj High " << endl;
-    double GainHigh=zOBJ_HIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    double GainHigh=zOBJ_HIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     
     cout << GainHigh << " Objective of high university " << endl;
     
     cout << " ------ " << endl;
-    double GainLow=zOBJ_LOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL, pH,ggamma, Abar, r, tthetaLthres,tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    double GainLow=zOBJ_LOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL, pH,ggamma, Abar, r, tthetaLthres,tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     cout << GainLow << " Objective of low university "<< endl;
     
     
@@ -2394,11 +2325,11 @@ int main(int argc, const char * argv[])
     //Defining the parameters
     optvalues paroptHIGH={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pL,ggamma,Abar,r,tthetaLthres,
-        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     optvalues paroptLOW={aalpha1,aalpha2,RMCH,RMCL,bbgrid,ttgrid,
         ssigma,bbeta,w,pH,ggamma,Abar,r,tthetaHthres,
-        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR};
+        tthetaRthres,bRthreshold,Rsubsidy,tax,ZHPAR,ZLPAR, T, S};
     
     //Defining the initial inputs
     xZobsHigh.resize(2);
@@ -2428,7 +2359,7 @@ int main(int argc, const char * argv[])
     cout << " ------------------------" << endl;
 
     
-    vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    vector<double> optL=optLOW(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pH,ggamma, Abar, r, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
 
     
@@ -2453,7 +2384,7 @@ int main(int argc, const char * argv[])
     
     vector<double>optH;
     optH.resize(3);
-    optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    optH=optHIGH(aalpha1, aalpha2, RMCH, RMCL, bbgrid,ttgrid, ssigma, bbeta, w, pL,ggamma, Abar, r, tthetaLthres, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     cout << " optimization found " << endl;
     cout << optH[0] << " price high opt " << endl;
     cout << optH[1] << " ttheta high opt " << endl;
@@ -2470,14 +2401,14 @@ int main(int argc, const char * argv[])
     double tthetaHnash=0.1;
     double tthetaLnash=0.1;
 
-    cout <<  NASHERROR(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PLNASH,PHNASH,ggamma, Abar, r, tthetaLnash,tthetaHnash,tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR) << " error " << endl;
+    cout <<  NASHERROR(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PLNASH,PHNASH,ggamma, Abar, r, tthetaLnash,tthetaHnash,tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, T, S) << " error " << endl;
     
     //Nash Equilibrium
     
     cout << "------------------------------------------ " << endl;
     cout << " Start solving NE via optimization routine " << endl;
     cout << " ----------------------------------------- " << endl;
-    vector<double> NASHMACHINE=NASHERRORFINDER(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, ggamma, Abar, r, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR);
+    vector<double> NASHMACHINE=NASHERRORFINDER(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, ggamma, Abar, r, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, T, S);
     
     
     // -----------------------------------------------------------------------------------------//
@@ -2512,8 +2443,8 @@ int main(int argc, const char * argv[])
     cout << "  " << endl;
     
     // Verifico manualmente que de lo mismo
-    vector<double> optLow = optLOWverify(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PH, ggamma, Abar, r, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, PL, TTHETAL);
-    vector<double> optHigh = optHIGHverify(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, ggamma, Abar, r, TTHETAL, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, PH, TTHETAH);
+    vector<double> optLow = optLOWverify(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PH, ggamma, Abar, r, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, PL, TTHETAL, T, S);
+    vector<double> optHigh = optHIGHverify(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, ggamma, Abar, r, TTHETAL, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, PH, TTHETAH, T, S);
     
     cout << " Manualmente: " << endl;
     cout << "  " << endl;
@@ -2527,7 +2458,7 @@ int main(int argc, const char * argv[])
     cout << "  " << endl;
     
     
-    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F=ZFP(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     double errorZ;
     double ZL;
@@ -2539,7 +2470,7 @@ int main(int argc, const char * argv[])
     ZH = F[0] + F[1];
     errorZ = F[2];
     
-    F = Zs(aalpha1, aalpha2, RMCH, RMCL, ZH, ZL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR);
+    F = Zs(aalpha1, aalpha2, RMCH, RMCL, ZH, ZL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax,ZHPAR,ZLPAR, T, S);
     
     ZH2 = F[0];
     ZL2 = F[1];
@@ -2560,7 +2491,7 @@ int main(int argc, const char * argv[])
     
     vector<double> Q;
     Q.resize(2);
-    Q = QUALITIES(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ZL, ZH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR);
+    Q = QUALITIES(aalpha1, aalpha2, RMCH, RMCL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ZL, ZH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR, T, S);
     
     double Ql;
     double Qh;
@@ -2575,7 +2506,7 @@ int main(int argc, const char * argv[])
     
     vector<double> Consumers;
     Consumers.resize(6);
-    Consumers=aaverages(ZH, ZL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax);
+    Consumers=aaverages(ZH, ZL, bbgrid, ttgrid, ssigma, bbeta, w, PL, PH, ggamma, Abar, r, TTHETAL, TTHETAH, tthetaRthres, bRthreshold, Rsubsidy, tax, T, S);
     
     cout << "  " << endl;
     cout << " OTHER STATISTICS ARE: " << endl;
@@ -2595,7 +2526,7 @@ int main(int argc, const char * argv[])
     cout << "------------------------------------ "<< endl;
     cout << " Start solving NE via Manual inputs " << endl;
     cout << " ---------------------------------- " << endl;
-    vector<double>NASEQSOL=NASHEQUILIBRIUM(aalpha1, aalpha2,RMCH, RMCL, bbgrid, ttgrid,ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR,1);
+    vector<double>NASEQSOL=NASHEQUILIBRIUM(aalpha1, aalpha2,RMCH, RMCL, bbgrid, ttgrid,ssigma, bbeta, w, pL, pH, ggamma, Abar, r, tthetaLthres, tthetaHthres, tthetaRthres, bRthreshold, Rsubsidy, tax, ZHPAR, ZLPAR,1, T, S);
     
     cout << NASEQSOL[0] << " NASEQSOL0"<< endl;
     cout << NASEQSOL[1] << " NASEQSOL1"<< endl;
